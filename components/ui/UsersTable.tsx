@@ -152,7 +152,7 @@ export default function UsersTable({
     <DataTable
       columns={columns}
       data={users}
-      rowKey={(user) => user._id}
+      rowKey={(user) => user.id || ""}
     />
   )
 }

@@ -221,7 +221,7 @@ export default function UsersPage() {
   }
 
 function handleView(user: AdminUser) {
-  router.push(`/users/${user._id}`);
+  router.push(`/users/${user.id}`);
 }
 
 

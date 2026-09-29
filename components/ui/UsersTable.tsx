@@ -11,7 +11,8 @@ import DataTable, {
 import Badge from "@/components/ui/Badge"
 
 export type AdminUser = {
-  _id: string
+  _id?: string
+  id?: string
   name: string
   email: string
   role:

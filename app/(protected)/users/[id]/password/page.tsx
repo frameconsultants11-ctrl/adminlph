@@ -42,15 +42,13 @@ function validatePassword(password: string) {
 }
 
 export default function ResetPasswordPage() {
-  const params =
-    useParams<{ id: string }>()
+  const params = useParams()
 
   const router = useRouter()
 
-  const id =
-    typeof params?.id === "string"
-      ? params.id
-      : ""
+  const id = Array.isArray(params?.id)
+    ? params.id[0]
+    : params?.id ?? ""
 
   const [password, setPassword] =
     useState("")

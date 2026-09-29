@@ -26,7 +26,8 @@ const securityHeaders = [
     key: "X-DNS-Prefetch-Control",
     value: "off",
   },
- {
+
+  {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
@@ -58,6 +59,21 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  /*
+   * Native Node.js packages
+   *
+   * @imgly/background-removal-node uses
+   * onnxruntime-node internally.
+   *
+   * Keep these packages external instead of
+   * letting Next/Turbopack bundle their native
+   * binaries.
+   */
+  serverExternalPackages: [
+    "onnxruntime-node",
+    "@imgly/background-removal-node",
+  ],
+
   async headers() {
     return [
       {

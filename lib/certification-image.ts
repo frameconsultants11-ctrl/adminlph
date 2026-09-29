@@ -6,11 +6,9 @@ import { pathToFileURL } from "url"
 
 import sharp from "sharp"
 import { put, del } from "@vercel/blob"
-import {
-  removeBackground,
-} from "@imgly/background-removal-node"
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_FILE_SIZE =
+  5 * 1024 * 1024
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -52,13 +50,22 @@ export async function uploadCertificationImage(
   )
 
   try {
-    const originalBuffer = Buffer.from(
-      new Uint8Array(
-        await file.arrayBuffer()
-      )
+    const {
+      removeBackground,
+    } = await import(
+      "@imgly/background-removal-node"
     )
 
-    // Normalize input to PNG
+    const originalBuffer =
+      Buffer.from(
+        new Uint8Array(
+          await file.arrayBuffer()
+        )
+      )
+
+    /*
+     * Normalize input to PNG
+     */
     await sharp(originalBuffer)
       .png()
       .toFile(inputPath)
@@ -71,6 +78,9 @@ export async function uploadCertificationImage(
       inputFileUrl
     )
 
+    /*
+     * Remove background
+     */
     const removedBackground =
       await removeBackground(
         inputFileUrl,
@@ -94,6 +104,10 @@ export async function uploadCertificationImage(
         }
       )
 
+    /*
+     * Convert Blob/ArrayBuffer result
+     * into a normal Node Buffer.
+     */
     const removedBuffer =
       Buffer.from(
         new Uint8Array(
@@ -101,6 +115,9 @@ export async function uploadCertificationImage(
         )
       )
 
+    /*
+     * Resize and compress
+     */
     const processedBuffer =
       await sharp(removedBuffer)
         .resize(1200, 1200, {
@@ -113,8 +130,12 @@ export async function uploadCertificationImage(
         })
         .toBuffer()
 
-    // Important:
-    // Create a normal Buffer copy before Vercel Blob
+    /*
+     * Important:
+     *
+     * Create a normal Buffer copy before
+     * sending the image to Vercel Blob.
+     */
     const finalBuffer =
       Buffer.from(
         new Uint8Array(
@@ -122,6 +143,9 @@ export async function uploadCertificationImage(
         )
       )
 
+    /*
+     * Upload to Vercel Blob
+     */
     const blob = await put(
       `certifications/${crypto.randomUUID()}.png`,
       finalBuffer,
@@ -139,6 +163,9 @@ export async function uploadCertificationImage(
 
     return blob.url
   } finally {
+    /*
+     * Always clean temporary files
+     */
     await fs.rm(tempDir, {
       recursive: true,
       force: true,

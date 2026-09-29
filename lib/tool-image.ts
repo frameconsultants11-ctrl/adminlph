@@ -5,18 +5,11 @@ import {
   put,
 } from "@vercel/blob"
 
-import {
-  removeBackground,
-} from "@imgly/background-removal-node"
-
 import sharp from "sharp"
 
 import crypto from "node:crypto"
-
 import fs from "node:fs/promises"
-
 import os from "node:os"
-
 import path from "node:path"
 
 import {
@@ -46,6 +39,23 @@ export async function uploadToolImage(
   file: File
 ) {
   // ========================================
+  // VALIDATE EMPTY
+  // ========================================
+
+  if (!file) {
+    throw new Error(
+      "Tool image is required"
+    )
+  }
+
+  if (file.size === 0) {
+    throw new Error(
+      "Image cannot be empty"
+    )
+  }
+
+
+  // ========================================
   // VALIDATE TYPE
   // ========================================
 
@@ -56,17 +66,6 @@ export async function uploadToolImage(
   ) {
     throw new Error(
       "Only JPG, PNG and WEBP images are allowed"
-    )
-  }
-
-
-  // ========================================
-  // VALIDATE EMPTY
-  // ========================================
-
-  if (file.size === 0) {
-    throw new Error(
-      "Image cannot be empty"
     )
   }
 
@@ -90,7 +89,9 @@ export async function uploadToolImage(
 
   const inputBuffer =
     Buffer.from(
-      await file.arrayBuffer()
+      new Uint8Array(
+        await file.arrayBuffer()
+      )
     )
 
 
@@ -105,7 +106,6 @@ export async function uploadToolImage(
         "tool-image-"
       )
     )
-
 
   const inputPath =
     path.join(
@@ -157,6 +157,36 @@ export async function uploadToolImage(
 
 
     // ======================================
+    // DYNAMIC IMPORT
+    //
+    // IMPORTANT:
+    // Do NOT import this package at the
+    // top of the file.
+    // ======================================
+
+    let removeBackground
+
+    try {
+      const module =
+        await import(
+          "@imgly/background-removal-node"
+        )
+
+      removeBackground =
+        module.removeBackground
+    } catch (error) {
+      console.error(
+        "BACKGROUND REMOVAL MODULE ERROR:",
+        error
+      )
+
+      throw new Error(
+        "Unable to load background removal engine"
+      )
+    }
+
+
+    // ======================================
     // REMOVE BACKGROUND
     // ======================================
 
@@ -200,13 +230,11 @@ export async function uploadToolImage(
     // ======================================
     // IMG.LY RESULT
     //
-    // IMPORTANT:
     // Make a real Buffer copy.
     // ======================================
 
     const resultArrayBuffer =
       await result.arrayBuffer()
-
 
     const resultBuffer =
       Buffer.from(
@@ -251,11 +279,7 @@ export async function uploadToolImage(
 
 
     // ======================================
-    // MAKE FINAL SAFE BUFFER
-    //
-    // Explicit copy ensures that the data
-    // passed to Vercel Blob is backed by a
-    // normal ArrayBuffer.
+    // FINAL SAFE BUFFER
     // ======================================
 
     const uploadBuffer =

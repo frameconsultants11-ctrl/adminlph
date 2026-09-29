@@ -6,9 +6,9 @@ import { pathToFileURL } from "url"
 
 import sharp from "sharp"
 import { put, del } from "@vercel/blob"
-import { removeBackground } from "@imgly/background-removal-node"
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_FILE_SIZE =
+  5 * 1024 * 1024
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -20,12 +20,20 @@ export async function uploadTrainerImage(
   file: File
 ) {
   if (!file) {
-    throw new Error("Trainer image is required")
+    throw new Error(
+      "Trainer image is required"
+    )
   }
 
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error(
       "Only JPG, PNG and WEBP images are allowed"
+    )
+  }
+
+  if (file.size === 0) {
+    throw new Error(
+      "Image cannot be empty"
     )
   }
 
@@ -56,10 +64,20 @@ export async function uploadTrainerImage(
     )
 
   try {
-    /*
-     * Convert uploaded image
-     * into PNG first.
-     */
+    // ======================================
+    // DYNAMIC IMPORT
+    // ======================================
+
+    const {
+      removeBackground,
+    } = await import(
+      "@imgly/background-removal-node"
+    )
+
+    // ======================================
+    // READ ORIGINAL IMAGE
+    // ======================================
+
     const originalBuffer =
       Buffer.from(
         new Uint8Array(
@@ -67,80 +85,133 @@ export async function uploadTrainerImage(
         )
       )
 
-    await sharp(originalBuffer)
-      .png()
-      .toFile(inputPath)
+    // ======================================
+    // NORMALIZE IMAGE
+    // ======================================
 
-    /*
-     * IMG.LY works reliably with
-     * file:// URLs.
-     */
+    try {
+      await sharp(originalBuffer)
+        .rotate()
+        .png()
+        .toFile(inputPath)
+    } catch (error) {
+      console.error(
+        "[TRAINER IMAGE NORMALIZATION ERROR]",
+        error
+      )
+
+      throw new Error(
+        "Invalid or unsupported image"
+      )
+    }
+
+    // ======================================
+    // FILE URL
+    // ======================================
+
     const inputFileUrl =
-      pathToFileURL(inputPath).href
+      pathToFileURL(
+        inputPath
+      ).href
 
     console.log(
       "[TRAINER BG REMOVE] INPUT:",
       inputFileUrl
     )
 
-    const removedBackground =
-      await removeBackground(
-        inputFileUrl,
-        {
-          model: "medium",
+    // ======================================
+    // REMOVE BACKGROUND
+    // ======================================
 
-          output: {
-            format: "image/png",
-            quality: 0.9,
-          },
+    let removedBackground
 
-          progress: (
-            key,
-            current,
-            total
-          ) => {
-            console.log(
-              `[TRAINER BG REMOVE] ${key}: ${current}/${total}`
-            )
-          },
-        }
+    try {
+      removedBackground =
+        await removeBackground(
+          inputFileUrl,
+          {
+            model: "medium",
+
+            output: {
+              format: "image/png",
+              quality: 0.9,
+            },
+
+            progress: (
+              key,
+              current,
+              total
+            ) => {
+              console.log(
+                `[TRAINER BG REMOVE] ${key}: ${current}/${total}`
+              )
+            },
+          }
+        )
+    } catch (error) {
+      console.error(
+        "[TRAINER BACKGROUND REMOVAL ERROR]",
+        error
       )
 
-    /*
-     * IMPORTANT:
-     * Explicit Uint8Array conversion
-     * avoids SharedArrayBuffer problems
-     * with Vercel Blob.
-     */
+      throw new Error(
+        "Unable to remove image background"
+      )
+    }
+
+    // ======================================
+    // IMG.LY RESULT
+    //
+    // Make a real Buffer copy.
+    // ======================================
+
+    const removedArrayBuffer =
+      await removedBackground.arrayBuffer()
+
     const removedBuffer =
       Buffer.from(
         new Uint8Array(
-          await removedBackground.arrayBuffer()
+          removedArrayBuffer
         )
       )
 
-    /*
-     * Resize and optimize.
-     */
-    const processedBuffer =
-      await sharp(removedBuffer)
-        .resize(
-          1200,
-          1200,
-          {
-            fit: "inside",
-            withoutEnlargement: true,
-          }
-        )
-        .png({
-          compressionLevel: 9,
-          quality: 90,
-        })
-        .toBuffer()
+    // ======================================
+    // RESIZE + OPTIMIZE
+    // ======================================
 
-    /*
-     * Final safe Buffer copy.
-     */
+    let processedBuffer
+
+    try {
+      processedBuffer =
+        await sharp(removedBuffer)
+          .resize(
+            1200,
+            1200,
+            {
+              fit: "inside",
+              withoutEnlargement: true,
+            }
+          )
+          .png({
+            compressionLevel: 9,
+            quality: 90,
+          })
+          .toBuffer()
+    } catch (error) {
+      console.error(
+        "[TRAINER IMAGE PROCESSING ERROR]",
+        error
+      )
+
+      throw new Error(
+        "Unable to process image"
+      )
+    }
+
+    // ======================================
+    // FINAL SAFE BUFFER
+    // ======================================
+
     const finalBuffer =
       Buffer.from(
         new Uint8Array(
@@ -148,25 +219,47 @@ export async function uploadTrainerImage(
         )
       )
 
-    /*
-     * Save temporarily if needed
-     * for debugging.
-     */
+    console.log(
+      "[TRAINER IMAGE] Final size:",
+      finalBuffer.length
+    )
+
+    // ======================================
+    // DEBUG OUTPUT
+    // ======================================
+
     await fs.writeFile(
       outputPath,
       finalBuffer
     )
 
-    const blob =
-      await put(
-        `trainers/${crypto.randomUUID()}.png`,
-        finalBuffer,
-        {
-          access: "public",
-          contentType: "image/png",
-          addRandomSuffix: false,
-        }
+    // ======================================
+    // UPLOAD TO VERCEL BLOB
+    // ======================================
+
+    let blob
+
+    try {
+      blob =
+        await put(
+          `trainers/${crypto.randomUUID()}.png`,
+          finalBuffer,
+          {
+            access: "public",
+            contentType: "image/png",
+            addRandomSuffix: false,
+          }
+        )
+    } catch (error) {
+      console.error(
+        "[TRAINER BLOB UPLOAD ERROR]",
+        error
       )
+
+      throw new Error(
+        "Unable to upload trainer image"
+      )
+    }
 
     console.log(
       "[TRAINER IMAGE] Uploaded:",
@@ -174,16 +267,33 @@ export async function uploadTrainerImage(
     )
 
     return blob.url
+
   } finally {
-    await fs.rm(
-      tempDir,
-      {
-        recursive: true,
-        force: true,
-      }
-    )
+    // ======================================
+    // CLEAN TEMP DIRECTORY
+    // ======================================
+
+    try {
+      await fs.rm(
+        tempDir,
+        {
+          recursive: true,
+          force: true,
+        }
+      )
+    } catch (error) {
+      console.error(
+        "[TRAINER TEMP CLEANUP ERROR]",
+        error
+      )
+    }
   }
 }
+
+
+// ==========================================
+// DELETE TRAINER IMAGE
+// ==========================================
 
 export async function deleteTrainerImage(
   imageUrl?: string | null

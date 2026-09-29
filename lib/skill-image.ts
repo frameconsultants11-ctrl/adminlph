@@ -5,18 +5,11 @@ import {
   put,
 } from "@vercel/blob"
 
-import {
-  removeBackground,
-} from "@imgly/background-removal-node"
-
 import sharp from "sharp"
 
 import crypto from "node:crypto"
-
 import fs from "node:fs/promises"
-
 import os from "node:os"
-
 import path from "node:path"
 
 import {
@@ -45,10 +38,21 @@ const ALLOWED_TYPES = [
 export async function uploadSkillImage(
   file: File
 ) {
+  // ========================================
+  // VALIDATE FILE
+  // ========================================
 
-  // ========================================
-  // VALIDATE TYPE
-  // ========================================
+  if (!file) {
+    throw new Error(
+      "Skill image is required"
+    )
+  }
+
+  if (file.size === 0) {
+    throw new Error(
+      "Image cannot be empty"
+    )
+  }
 
   if (
     !ALLOWED_TYPES.includes(
@@ -59,22 +63,6 @@ export async function uploadSkillImage(
       "Only JPG, PNG and WEBP images are allowed"
     )
   }
-
-
-  // ========================================
-  // VALIDATE EMPTY
-  // ========================================
-
-  if (file.size === 0) {
-    throw new Error(
-      "Image cannot be empty"
-    )
-  }
-
-
-  // ========================================
-  // VALIDATE SIZE
-  // ========================================
 
   if (
     file.size > MAX_FILE_SIZE
@@ -91,7 +79,9 @@ export async function uploadSkillImage(
 
   const inputBuffer =
     Buffer.from(
-      await file.arrayBuffer()
+      new Uint8Array(
+        await file.arrayBuffer()
+      )
     )
 
 
@@ -107,7 +97,6 @@ export async function uploadSkillImage(
       )
     )
 
-
   const inputPath =
     path.join(
       tempDir,
@@ -116,6 +105,37 @@ export async function uploadSkillImage(
 
 
   try {
+
+    // ======================================
+    // DYNAMIC IMPORT
+    //
+    // Important for ONNX / Next.js
+    // ======================================
+
+    let removeBackground
+
+    try {
+
+      const module =
+        await import(
+          "@imgly/background-removal-node"
+        )
+
+      removeBackground =
+        module.removeBackground
+
+    } catch (error) {
+
+      console.error(
+        "SKILL BACKGROUND MODULE ERROR:",
+        error
+      )
+
+      throw new Error(
+        "Unable to load background removal engine"
+      )
+    }
+
 
     // ======================================
     // NORMALIZE IMAGE
@@ -217,7 +237,6 @@ export async function uploadSkillImage(
     const resultArrayBuffer =
       await result.arrayBuffer()
 
-
     const resultBuffer =
       Buffer.from(
         new Uint8Array(
@@ -290,7 +309,7 @@ export async function uploadSkillImage(
 
 
     // ======================================
-    // UPLOAD
+    // UPLOAD TO VERCEL BLOB
     // ======================================
 
     let blob
@@ -358,6 +377,7 @@ export async function uploadSkillImage(
         "SKILL TEMP CLEANUP ERROR:",
         error
       )
+
     }
   }
 }
@@ -387,5 +407,6 @@ export async function deleteSkillImage(
       "SKILL IMAGE DELETE ERROR:",
       error
     )
+
   }
 }

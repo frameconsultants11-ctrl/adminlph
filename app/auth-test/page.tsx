@@ -17,7 +17,7 @@ type Session = {
   deviceId: string
   deviceName: string | null
   createdAt: string
-  lastUsedAt?: string
+  lastUsedAt?: string | null
   expiresAt: string
 }
 
@@ -72,6 +72,13 @@ export default function AuthTestPage() {
     useState("")
 
   // =========================================================
+  // DEVICE
+  // =========================================================
+
+  const [deviceId, setDeviceId] =
+    useState("")
+
+  // =========================================================
   // DATA
   // =========================================================
 
@@ -112,20 +119,24 @@ export default function AuthTestPage() {
   // =========================================================
 
   function getDeviceId() {
-    let deviceId =
-      localStorage.getItem("deviceId")
+    if (typeof window === "undefined") {
+      return ""
+    }
 
-    if (!deviceId) {
-      deviceId =
-        crypto.randomUUID()
+    let id = localStorage.getItem(
+      "deviceId"
+    )
+
+    if (!id) {
+      id = crypto.randomUUID()
 
       localStorage.setItem(
         "deviceId",
-        deviceId
+        id
       )
     }
 
-    return deviceId
+    return id
   }
 
   // =========================================================
@@ -141,11 +152,10 @@ export default function AuthTestPage() {
     setLastAction(action)
 
     try {
-      const res =
-        await apiFetch(
-          url,
-          options
-        )
+      const res = await apiFetch(
+        url,
+        options
+      )
 
       const contentType =
         res.headers.get(
@@ -222,7 +232,10 @@ export default function AuthTestPage() {
             deviceId:
               getDeviceId(),
             deviceName:
-              navigator.userAgent,
+              typeof navigator !==
+              "undefined"
+                ? navigator.userAgent
+                : "Unknown Device",
           }),
         },
         "LOGIN"
@@ -727,6 +740,10 @@ export default function AuthTestPage() {
   // =========================================================
 
   useEffect(() => {
+    const id = getDeviceId()
+
+    setDeviceId(id)
+
     getProfile()
   }, [])
 
@@ -753,7 +770,8 @@ export default function AuthTestPage() {
 
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <span className="rounded-full bg-white/10 px-3 py-1">
-              Device: {getDeviceId()}
+              Device:{" "}
+              {deviceId || "Loading..."}
             </span>
 
             {loading && (
@@ -897,6 +915,7 @@ export default function AuthTestPage() {
           </h2>
 
           <div className="mb-4 max-w-xl">
+
             <input
               className="w-full rounded-lg border p-3"
               placeholder="New password"
@@ -908,6 +927,7 @@ export default function AuthTestPage() {
                 )
               }
             />
+
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -989,7 +1009,7 @@ export default function AuthTestPage() {
 
                   const currentDevice =
                     session.deviceId ===
-                    getDeviceId()
+                    deviceId
 
                   return (
                     <div
@@ -1002,6 +1022,7 @@ export default function AuthTestPage() {
                       <div className="flex items-center justify-between">
 
                         <div>
+
                           <p className="font-semibold">
                             {currentDevice
                               ? "Current Device"
@@ -1012,6 +1033,7 @@ export default function AuthTestPage() {
                             {session.deviceName ||
                               "Unknown device"}
                           </p>
+
                         </div>
 
                         {currentDevice && (
@@ -1044,6 +1066,17 @@ export default function AuthTestPage() {
                             new Date(
                               session.createdAt
                             ).toLocaleString()
+                          }
+                        />
+
+                        <Info
+                          label="Last Used"
+                          value={
+                            session.lastUsedAt
+                              ? new Date(
+                                  session.lastUsedAt
+                                ).toLocaleString()
+                              : "Never"
                           }
                         />
 
@@ -1158,6 +1191,7 @@ export default function AuthTestPage() {
             </select>
 
             <label className="flex items-center gap-3 rounded-lg border p-3">
+
               <input
                 type="checkbox"
                 checked={targetIsActive}
@@ -1169,6 +1203,7 @@ export default function AuthTestPage() {
               />
 
               Active
+
             </label>
 
           </div>
@@ -1257,6 +1292,7 @@ export default function AuthTestPage() {
                     }
                     className="block w-full rounded-lg border p-4 text-left hover:bg-gray-50"
                   >
+
                     <div className="flex justify-between">
 
                       <span className="font-semibold">
@@ -1485,7 +1521,8 @@ export default function AuthTestPage() {
               <strong>
                 Device ID:
               </strong>{" "}
-              {getDeviceId()}
+              {deviceId ||
+                "Loading..."}
             </p>
 
           </div>
@@ -1543,7 +1580,6 @@ export default function AuthTestPage() {
     </main>
   )
 }
-
 
 // =========================================================
 // INFO COMPONENT

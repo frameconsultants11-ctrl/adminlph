@@ -286,7 +286,7 @@ export async function GET(req: NextRequest) {
               "PASSWORD_CHANGED",
               "PASSWORD_RESET",
               "ACCOUNT_DISABLED",
-              "ACCOUNT_ENABLED",
+              "USER_REACTIVATED",
               "USER_CREATED",
               "USER_DELETED",
             ],

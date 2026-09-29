@@ -53,9 +53,9 @@ type UserDetails = {
 type Session = {
   sessionId: string;
   deviceId: string;
-  deviceName?: string;
+  deviceName?: string | null;
   createdAt: string;
-  lastUsedAt?: string;
+  lastUsedAt?: string | null;
   expiresAt: string;
 };
 
@@ -1391,9 +1391,8 @@ async function handleDeactivate() {
                             "
                           >
                             {getDeviceLabel(
-                              session?.deviceName
-                            ) ||
-                              "Unknown device"}
+  session.deviceName ?? ""
+) || "Unknown device"}
                           </p>
 
                           <p className="mt-0.5 text-[10px] text-[#999]">
@@ -1616,10 +1615,9 @@ async function handleDeactivate() {
                   dark:text-[#ddd]
                 "
               >
-                {getDeviceLabel(
-                  confirmSession.deviceName
-                ) ||
-                  "Unknown device"}
+               {getDeviceLabel(
+  confirmSession.deviceName ?? ""
+) || "Unknown device"}
               </p>
 
               <p

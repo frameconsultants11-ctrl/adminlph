@@ -220,21 +220,10 @@ export default function UsersPage() {
     setPage(1);
   }
 
-  /* =======================================================
-     VIEW USER
-  ======================================================= */
+function handleView(user: AdminUser) {
+  router.push(`/users/${user._id}`);
+}
 
-  function handleView(
-    user: AdminUser
-  ) {
-    router.push(
-      `/users/${user.id}`
-    );
-  }
-
-  /* =======================================================
-     PAGE
-  ======================================================= */
 
   return (
     <div

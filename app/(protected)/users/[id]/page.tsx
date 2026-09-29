@@ -1428,11 +1428,11 @@ async function handleDeactivate() {
                       />
 
                       <SessionDetail
-                        label="Last used"
-                        value={formatDate(
-                          session.lastUsedAt
-                        )}
-                      />
+  label="Last used"
+  value={formatDate(
+    session.lastUsedAt ?? undefined
+  )}
+/>
 
                       <SessionDetail
                         label="Expires"

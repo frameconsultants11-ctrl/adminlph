@@ -1,19 +1,30 @@
-import { NextRequest, NextResponse } from "next/server"
-import { ObjectId } from "mongodb"
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server"
 
 import { getDb } from "@/lib/db"
-import { authenticate, authorize } from "@/lib/auth"
-import { requireCsrf } from "@/lib/require-csrf"
+
+import {
+  authenticate,
+  authorize,
+} from "@/lib/auth"
+
+import {
+  requireCsrf,
+} from "@/lib/require-csrf"
 
 import {
   getCertificationCollection,
 } from "@/models/certification"
 
 import {
-  uploadCertificationImage,
-} from "@/lib/certification-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import { logAudit } from "@/lib/audit"
+
 
 function serializeCertification(
   certification: any
@@ -21,9 +32,11 @@ function serializeCertification(
   return {
     ...certification,
 
-    _id: certification._id?.toString(),
+    _id:
+      certification._id?.toString(),
   }
 }
+
 
 /* =========================
    GET
@@ -32,18 +45,30 @@ function serializeCertification(
 export async function GET(
   req: NextRequest
 ) {
+
   try {
-    const user = await authenticate(req)
 
-    authorize(user, "admin")
+    const user =
+      await authenticate(req)
 
-    const db = await getDb()
+    authorize(
+      user,
+      "admin"
+    )
+
+    const db =
+      await getDb()
 
     const collection =
-      getCertificationCollection(db)
+      getCertificationCollection(
+        db
+      )
 
-    const { searchParams } =
-      new URL(req.url)
+    const {
+      searchParams,
+    } = new URL(
+      req.url
+    )
 
     const search =
       searchParams
@@ -51,53 +76,77 @@ export async function GET(
         ?.trim() || ""
 
     const isActive =
-      searchParams.get("isActive")
-
-    const page = Math.max(
-      1,
-      Number(
-        searchParams.get("page") || 1
+      searchParams.get(
+        "isActive"
       )
-    )
 
-    const limit = Math.min(
-      100,
+    const page =
       Math.max(
         1,
         Number(
-          searchParams.get("limit") || 10
+          searchParams.get(
+            "page"
+          ) || 1
         )
       )
-    )
+
+    const limit =
+      Math.min(
+        100,
+        Math.max(
+          1,
+          Number(
+            searchParams.get(
+              "limit"
+            ) || 10
+          )
+        )
+      )
 
     const query: any = {}
 
-    /* Search */
+
+    /* =========================
+       SEARCH
+    ========================= */
 
     if (search) {
+
       query.name = {
-        $regex: search,
+        $regex:
+          escapeRegex(search),
+
         $options: "i",
       }
+
     }
 
-    /* Active filter */
+
+    /* =========================
+       ACTIVE FILTER
+    ========================= */
 
     if (
       isActive === "true" ||
       isActive === "false"
     ) {
+
       query.isActive =
         isActive === "true"
+
     }
 
+
     const skip =
-      (page - 1) * limit
+      (page - 1) *
+      limit
+
 
     const [
       certifications,
       total,
     ] = await Promise.all([
+
       collection
         .find(query)
         .sort({
@@ -110,53 +159,79 @@ export async function GET(
       collection.countDocuments(
         query
       ),
+
     ])
 
+
     return NextResponse.json({
+
       success: true,
 
-      data: certifications.map(
-        serializeCertification
-      ),
+      data:
+        certifications.map(
+          serializeCertification
+        ),
 
       pagination: {
+
         page,
+
         limit,
+
         total,
-        totalPages: Math.ceil(
-          total / limit
-        ),
+
+        totalPages:
+          Math.ceil(
+            total / limit
+          ),
+
       },
+
     })
+
   } catch (error: any) {
+
     console.error(
       "GET CERTIFICATIONS ERROR:",
       error
     )
 
+
     const status =
       error.message ===
       "Authentication required"
+
         ? 401
-        : error.message.includes(
+
+        : error.message?.includes(
             "permission"
           )
+
         ? 403
+
         : 500
 
+
     return NextResponse.json(
+
       {
         success: false,
+
         message:
           error.message ||
           "Failed to fetch certifications",
       },
+
       {
         status,
       }
+
     )
+
   }
+
 }
+
 
 /* =========================
    POST
@@ -165,20 +240,36 @@ export async function GET(
 export async function POST(
   req: NextRequest
 ) {
+
   let uploadedImage:
     | string
     | null = null
 
+
   try {
+
+    /* =========================
+       AUTH
+    ========================= */
+
     const user =
       await authenticate(req)
 
-    authorize(user, "admin")
+    authorize(
+      user,
+      "admin"
+    )
 
     requireCsrf(req)
 
+
+    /* =========================
+       FORM DATA
+    ========================= */
+
     const formData =
       await req.formData()
+
 
     const nameValue =
       formData.get("name")
@@ -187,127 +278,269 @@ export async function POST(
       formData.get("image")
 
     const isActiveValue =
-      formData.get("isActive")
+      formData.get(
+        "isActive"
+      )
 
-    /* Validate name */
+
+    /* =========================
+       VALIDATE NAME
+    ========================= */
 
     if (
-      typeof nameValue !== "string" ||
+      typeof nameValue !==
+        "string" ||
       !nameValue.trim()
     ) {
+
       return NextResponse.json(
+
         {
           success: false,
+
           message:
             "Certification name is required",
         },
+
         {
           status: 400,
         }
+
       )
+
     }
+
 
     const name =
       nameValue.trim()
 
-    /* Validate image */
+
+    /* =========================
+       VALIDATE IMAGE
+    ========================= */
 
     if (
       !imageValue ||
       !(imageValue instanceof File)
     ) {
+
       return NextResponse.json(
+
         {
           success: false,
+
           message:
             "Certification image is required",
         },
+
         {
           status: 400,
         }
+
       )
+
     }
+
+
+    if (
+      imageValue.size === 0
+    ) {
+
+      return NextResponse.json(
+
+        {
+          success: false,
+
+          message:
+            "Certification image cannot be empty",
+        },
+
+        {
+          status: 400,
+        }
+
+      )
+
+    }
+
+
+    /* =========================
+       ACTIVE
+    ========================= */
 
     const isActive =
       isActiveValue === "false"
         ? false
         : true
 
-    const db = await getDb()
+
+    /* =========================
+       DATABASE
+    ========================= */
+
+    const db =
+      await getDb()
 
     const collection =
-      getCertificationCollection(db)
+      getCertificationCollection(
+        db
+      )
 
-    /* Duplicate check */
+
+    /* =========================
+       DUPLICATE CHECK
+    ========================= */
 
     const existing =
       await collection.findOne({
+
         name: {
-          $regex: `^${escapeRegex(
-            name
-          )}$`,
+          $regex:
+            `^${escapeRegex(
+              name
+            )}$`,
+
           $options: "i",
         },
+
       })
 
+
     if (existing) {
+
       return NextResponse.json(
+
         {
           success: false,
+
           message:
             "Certification already exists",
         },
+
         {
           status: 409,
         }
+
       )
+
     }
 
-    /* Upload image */
+
+    /* =========================
+       UPLOAD IMAGE
+    ========================= */
+
+    const uploaded =
+      await uploadImage(
+        imageValue,
+        {
+          folder:
+            "certifications",
+
+          removeBackground:
+            true,
+
+          backgroundModel:
+            "medium",
+
+          maxWidth:
+            1200,
+
+          maxHeight:
+            1200,
+
+          format:
+            "png",
+
+          quality:
+            90,
+        }
+      )
+
 
     uploadedImage =
-      await uploadCertificationImage(
-        imageValue
-      )
+      uploaded.url
 
-    const now = new Date()
+
+    /* =========================
+       CREATE DOCUMENT
+    ========================= */
+
+    const now =
+      new Date()
+
 
     const certification = {
+
       name,
-      image: uploadedImage,
+
+      image:
+        uploaded.url,
+
       isActive,
 
-      createdAt: now,
-      updatedAt: now,
+      createdAt:
+        now,
+
+      updatedAt:
+        now,
+
     }
+
 
     const result =
       await collection.insertOne(
         certification
       )
 
+
+    /* =========================
+       FETCH CREATED
+    ========================= */
+
     const created =
       await collection.findOne({
-        _id: result.insertedId,
+
+        _id:
+          result.insertedId,
+
       })
 
-    /* Audit */
+
+    /* =========================
+       AUDIT
+    ========================= */
 
     await logAudit({
-      userId: user._id,
+
+      userId:
+        user._id,
+
       action:
         "CERTIFICATION_CREATED",
+
       metadata: {
+
         certificationId:
           result.insertedId.toString(),
 
         name,
+
       },
+
     })
 
+
+    /* =========================
+       RESPONSE
+    ========================= */
+
     return NextResponse.json(
+
       {
-        success: true,
+
+        success:
+          true,
 
         message:
           "Certification created successfully",
@@ -316,52 +549,88 @@ export async function POST(
           serializeCertification(
             created
           ),
+
       },
+
       {
-        status: 201,
+        status:
+          201,
       }
+
     )
+
   } catch (error: any) {
+
     console.error(
       "CREATE CERTIFICATION ERROR:",
       error
     )
 
-    /*
-     * If DB insert/update failed after
-     * image upload, remove the new image.
-     */
+
+    /* =========================
+       CLEANUP IMAGE
+    ========================= */
 
     if (uploadedImage) {
-      const {
-        deleteCertificationImage,
-      } = await import(
-        "@/lib/certification-image"
-      )
 
-      await deleteCertificationImage(
-        uploadedImage
-      )
+      try {
+
+        await deleteImage(
+          uploadedImage
+        )
+
+      } catch (
+        cleanupError
+      ) {
+
+        console.error(
+          "FAILED TO DELETE CERTIFICATION IMAGE:",
+          cleanupError
+        )
+
+      }
+
     }
 
+
+    /* =========================
+       ERROR RESPONSE
+    ========================= */
+
     return NextResponse.json(
+
       {
-        success: false,
+
+        success:
+          false,
+
         message:
           error.message ||
           "Failed to create certification",
+
       },
+
       {
+
         status:
           error.message?.includes(
             "CSRF"
           )
             ? 403
+            : error.message?.includes(
+                "permission"
+              )
+            ? 403
             : 500,
+
       }
+
     )
+
   }
+
 }
+
 
 /* =========================
    REGEX ESCAPE
@@ -370,8 +639,10 @@ export async function POST(
 function escapeRegex(
   value: string
 ) {
+
   return value.replace(
     /[.*+?^${}()|[\]\\]/g,
     "\\$&"
   )
+
 }

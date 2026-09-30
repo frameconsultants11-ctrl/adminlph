@@ -17,22 +17,21 @@ import {
 } from "@/lib/db"
 
 import {
-  getToolCollection,
-} from "@/models/tool"
+  getCategoryCollection,
+} from "@/models/category"
 
 import {
-  uploadToolImage,
-  deleteToolImage,
-} from "@/lib/tool-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import {
   logAudit,
 } from "@/lib/audit"
-import { deleteImage, uploadImage } from "@/lib/image/image-upload"
 
 
 // ============================================
-// GET /api/admin/tools
+// GET /api/admin/categories
 // ============================================
 
 export async function GET(
@@ -50,6 +49,7 @@ export async function GET(
       user,
       "admin"
     )
+
 
     // --------------------------------
     // QUERY
@@ -83,10 +83,9 @@ export async function GET(
         ) || 20
       )
 
+
     const page =
-      Number.isFinite(
-        pageParam
-      )
+      Number.isFinite(pageParam)
         ? Math.max(
             1,
             pageParam
@@ -94,9 +93,7 @@ export async function GET(
         : 1
 
     const limit =
-      Number.isFinite(
-        limitParam
-      )
+      Number.isFinite(limitParam)
         ? Math.min(
             100,
             Math.max(
@@ -109,6 +106,7 @@ export async function GET(
     const skip =
       (page - 1) *
       limit
+
 
     // --------------------------------
     // FILTER
@@ -123,12 +121,14 @@ export async function GET(
       isActive?: boolean
     } = {}
 
+
     if (search) {
       filter.name = {
         $regex: search,
         $options: "i",
       }
     }
+
 
     if (
       isActiveParam === "true" ||
@@ -139,6 +139,7 @@ export async function GET(
         "true"
     }
 
+
     // --------------------------------
     // DATABASE
     // --------------------------------
@@ -146,14 +147,15 @@ export async function GET(
     const db =
       await getDb()
 
-    const tools =
-      getToolCollection(db)
+    const categories =
+      getCategoryCollection(db)
+
 
     const [
       items,
       total,
     ] = await Promise.all([
-      tools
+      categories
         .find(filter)
         .sort({
           createdAt: -1,
@@ -162,10 +164,11 @@ export async function GET(
         .limit(limit)
         .toArray(),
 
-      tools.countDocuments(
+      categories.countDocuments(
         filter
       ),
     ])
+
 
     // --------------------------------
     // RESPONSE
@@ -174,7 +177,13 @@ export async function GET(
     return NextResponse.json({
       success: true,
 
-      data: items,
+      data: items.map(
+        category => ({
+          ...category,
+          _id:
+            category._id?.toString(),
+        })
+      ),
 
       pagination: {
         page,
@@ -186,11 +195,14 @@ export async function GET(
           ),
       },
     })
+
   } catch (error) {
+
     console.error(
-      "GET TOOLS ERROR:",
+      "GET CATEGORIES ERROR:",
       error
     )
+
 
     if (
       error instanceof Error &&
@@ -213,6 +225,7 @@ export async function GET(
       )
     }
 
+
     if (
       error instanceof Error &&
       error.message.includes(
@@ -231,11 +244,12 @@ export async function GET(
       )
     }
 
+
     return NextResponse.json(
       {
         success: false,
         message:
-          "Unable to fetch tools",
+          "Unable to fetch categories",
       },
       {
         status: 500,
@@ -246,7 +260,7 @@ export async function GET(
 
 
 // ============================================
-// POST /api/admin/tools
+// POST /api/admin/categories
 // ============================================
 
 export async function POST(
@@ -257,11 +271,13 @@ export async function POST(
     | undefined
 
   try {
+
     // --------------------------------
     // CSRF
     // --------------------------------
 
     requireCsrf(req)
+
 
     // --------------------------------
     // AUTH
@@ -274,6 +290,7 @@ export async function POST(
       user,
       "admin"
     )
+
 
     // --------------------------------
     // FORM DATA
@@ -299,6 +316,7 @@ export async function POST(
         "image"
       )
 
+
     // --------------------------------
     // VALIDATE NAME
     // --------------------------------
@@ -308,13 +326,14 @@ export async function POST(
         {
           success: false,
           message:
-            "Tool name is required",
+            "Category name is required",
         },
         {
           status: 400,
         }
       )
     }
+
 
     // --------------------------------
     // VALIDATE IMAGE
@@ -328,7 +347,7 @@ export async function POST(
         {
           success: false,
           message:
-            "Tool image is required",
+            "Category image is required",
         },
         {
           status: 400,
@@ -336,18 +355,20 @@ export async function POST(
       )
     }
 
+
     if (image.size === 0) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Tool image cannot be empty",
+            "Category image cannot be empty",
         },
         {
           status: 400,
         }
       )
     }
+
 
     // --------------------------------
     // VALIDATE ACTIVE STATUS
@@ -358,6 +379,7 @@ export async function POST(
     if (
       isActiveValue !== null
     ) {
+
       if (
         isActiveValue !== "true" &&
         isActiveValue !== "false"
@@ -379,26 +401,6 @@ export async function POST(
         "true"
     }
 
-    // --------------------------------
-    // UPLOAD IMAGE
-    // --------------------------------
-
-    const uploaded =
-  await uploadImage(
-    image,
-    {
-      folder: "skills",
-      removeBackground: true,
-      backgroundModel: "medium",
-      maxWidth: 1200,
-      maxHeight: 1200,
-      format: "png",
-      quality: 90,
-    }
-  )
-
-uploadedImageUrl =
-  uploaded.url
 
     // --------------------------------
     // DATABASE
@@ -407,14 +409,80 @@ uploadedImageUrl =
     const db =
       await getDb()
 
-    const tools =
-      getToolCollection(db)
+    const categories =
+      getCategoryCollection(db)
+
+
+    // --------------------------------
+    // DUPLICATE NAME
+    // --------------------------------
+
+    const existing =
+      await categories.findOne({
+        name: {
+          $regex:
+            `^${escapeRegex(name)}$`,
+          $options: "i",
+        },
+      })
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Category already exists",
+        },
+        {
+          status: 409,
+        }
+      )
+    }
+
+
+    // --------------------------------
+    // UPLOAD IMAGE
+    // --------------------------------
+
+    const uploaded =
+      await uploadImage(
+        image,
+        {
+          folder: "categories",
+
+          removeBackground:
+            true,
+
+          backgroundModel:
+            "medium",
+
+          maxWidth:
+            1200,
+
+          maxHeight:
+            1200,
+
+          format:
+            "png",
+
+          quality:
+            90,
+        }
+      )
+
+    uploadedImageUrl =
+      uploaded.url
+
+
+    // --------------------------------
+    // INSERT
+    // --------------------------------
 
     const now =
       new Date()
 
     const result =
-      await tools.insertOne({
+      await categories.insertOne({
         name,
 
         image:
@@ -429,6 +497,7 @@ uploadedImageUrl =
           now,
       })
 
+
     // --------------------------------
     // AUDIT
     // --------------------------------
@@ -438,13 +507,13 @@ uploadedImageUrl =
         user._id,
 
       action:
-        "TOOL_CREATED",
+        "CATEGORY_CREATED",
 
       metadata: {
         resource:
-          "tool",
+          "category",
 
-        toolId:
+        categoryId:
           result.insertedId.toString(),
 
         name,
@@ -452,6 +521,7 @@ uploadedImageUrl =
         isActive,
       },
     })
+
 
     // --------------------------------
     // RESPONSE
@@ -462,11 +532,11 @@ uploadedImageUrl =
         success: true,
 
         message:
-          "Tool created successfully",
+          "Category created successfully",
 
         data: {
           _id:
-            result.insertedId,
+            result.insertedId.toString(),
 
           name,
 
@@ -486,28 +556,34 @@ uploadedImageUrl =
         status: 201,
       }
     )
+
   } catch (error) {
+
     console.error(
-      "CREATE TOOL ERROR:",
+      "CREATE CATEGORY ERROR:",
       error
     )
 
+
     // --------------------------------
-    // CLEAN UP ORPHANED BLOB
+    // CLEAN ORPHAN IMAGE
     // --------------------------------
 
     if (uploadedImageUrl) {
-  try {
-    await deleteImage(
-      uploadedImageUrl
-    )
-  } catch (cleanupError) {
-    console.error(
-      "FAILED TO DELETE UPLOADED SKILL IMAGE:",
-      cleanupError
-    )
-  }
-}
+      try {
+        await deleteImage(
+          uploadedImageUrl
+        )
+      } catch (
+        cleanupError
+      ) {
+        console.error(
+          "FAILED TO DELETE CATEGORY IMAGE:",
+          cleanupError
+        )
+      }
+    }
+
 
     // --------------------------------
     // CSRF ERROR
@@ -530,6 +606,7 @@ uploadedImageUrl =
       )
     }
 
+
     // --------------------------------
     // IMAGE ERROR
     // --------------------------------
@@ -542,6 +619,9 @@ uploadedImageUrl =
         ) ||
         error.message.includes(
           "Image size"
+        ) ||
+        error.message.includes(
+          "Invalid or unsupported image"
         )
       )
     ) {
@@ -556,6 +636,7 @@ uploadedImageUrl =
         }
       )
     }
+
 
     // --------------------------------
     // PERMISSION ERROR
@@ -579,6 +660,30 @@ uploadedImageUrl =
       )
     }
 
+
+    // --------------------------------
+    // DUPLICATE
+    // --------------------------------
+
+    if (
+      error instanceof Error &&
+      error.message.includes(
+        "Category already exists"
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            error.message,
+        },
+        {
+          status: 409,
+        }
+      )
+    }
+
+
     // --------------------------------
     // GENERIC ERROR
     // --------------------------------
@@ -587,11 +692,25 @@ uploadedImageUrl =
       {
         success: false,
         message:
-          "Unable to create tool",
+          "Unable to create category",
       },
       {
         status: 500,
       }
     )
   }
+}
+
+
+// ============================================
+// ESCAPE REGEX
+// ============================================
+
+function escapeRegex(
+  value: string
+) {
+  return value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
+  )
 }

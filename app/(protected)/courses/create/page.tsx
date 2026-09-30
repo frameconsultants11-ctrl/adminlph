@@ -1,4 +1,5 @@
-import TrainerEditor from "@/components/TrainerEditor"
+import CourseForm from "@/components/CourseForm";
+
 
 export default async function TrainerPage({
   params,
@@ -6,6 +7,5 @@ export default async function TrainerPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-
-  return <TrainerEditor id={id} />
+  return <CourseForm mode="create" />
 }

@@ -59,4 +59,14 @@ export function verifyCsrfToken(
     cookieBuffer,
     headerBuffer
   )
+} 
+
+export function requireCsrf(
+  req: NextRequest
+) {
+  if (!verifyCsrfToken(req)) {
+    throw new Error(
+      "Invalid CSRF token"
+    )
+  }
 }

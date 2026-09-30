@@ -50,6 +50,9 @@ import {
   Ribbon,
   UserCircle2,
   MonitorDotIcon,
+  Group,
+  GroupIcon,
+  Layers3,
 } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
@@ -230,6 +233,25 @@ const menuItems: SidebarItem[] = [
 ========================================================= */
 
 const folders: FolderItem[] = [
+  {
+    label: "Course",
+    icon: MonitorDotIcon,
+    color: "text-black-500",
+
+    children: [
+      {
+        label: "Course",
+        icon: Toolbox,
+        href: "/courses",
+      },
+
+      {
+        label: "Course Categories",
+        icon: Layers3,
+        href: "/categories",
+      },
+    ],
+  },
  {
     label: "Skills & Tools",
     icon: ToolCase,
@@ -720,15 +742,6 @@ export default function Sidebar({
         ================================================= */}
 
         <div className="mt-5">
-          <SidebarLink
-            href="/course"
-            label="Course"
-            icon={MonitorDotIcon}
-            collapsed={collapsed}
-            active={isActive(
-              "/course",
-            )}
-          />
 
           <div className="mt-1 space-y-1">
             {folders.map(

@@ -23,9 +23,9 @@ import {
 } from "@/lib/skill"
 
 import {
-  uploadSkillImage,
-  deleteSkillImage,
-} from "@/lib/skill-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import {
   logAudit,
@@ -417,14 +417,22 @@ export async function POST(
     // UPLOAD IMAGE
     // ======================================
 
-    const uploaded =
-      await uploadSkillImage(
-        image
-      )
+   const uploaded =
+  await uploadImage(
+    image,
+    {
+      folder: "skills",
+      removeBackground: true,
+      backgroundModel: "medium",
+      maxWidth: 1200,
+      maxHeight: 1200,
+      format: "png",
+      quality: 90,
+    }
+  )
 
-
-    uploadedImageUrl =
-      uploaded.url
+uploadedImageUrl =
+  uploaded.url
 
 
     // ======================================
@@ -524,16 +532,18 @@ export async function POST(
       error
     )
 
-
-    if (
+if (uploadedImageUrl) {
+  try {
+    await deleteImage(
       uploadedImageUrl
-    ) {
-
-      await deleteSkillImage(
-        uploadedImageUrl
-      )
-
-    }
+    )
+  } catch (cleanupError) {
+    console.error(
+      "FAILED TO DELETE UPLOADED SKILL IMAGE:",
+      cleanupError
+    )
+  }
+}
 
 
     if (

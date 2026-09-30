@@ -1,3 +1,5 @@
+// app/api/admin/tools/[id]/route.ts
+
 import {
   NextRequest,
   NextResponse,
@@ -25,14 +27,18 @@ import {
 } from "@/models/tool"
 
 import {
-  uploadToolImage,
-  deleteToolImage,
-} from "@/lib/tool-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import {
   logAudit,
 } from "@/lib/audit"
 
+
+// ============================================
+// PARAMS
+// ============================================
 
 type Params = {
   params: Promise<{
@@ -51,7 +57,9 @@ export async function GET(
     params,
   }: Params
 ) {
+
   try {
+
     // --------------------------------
     // AUTH
     // --------------------------------
@@ -64,6 +72,7 @@ export async function GET(
       "admin"
     )
 
+
     // --------------------------------
     // PARAMS
     // --------------------------------
@@ -72,12 +81,15 @@ export async function GET(
       id,
     } = await params
 
+
     if (
       !ObjectId.isValid(id)
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid tool ID",
         },
@@ -85,7 +97,9 @@ export async function GET(
           status: 400,
         }
       )
+
     }
+
 
     // --------------------------------
     // DATABASE
@@ -97,16 +111,24 @@ export async function GET(
     const tools =
       getToolCollection(db)
 
+
+    // --------------------------------
+    // FIND TOOL
+    // --------------------------------
+
     const tool =
       await tools.findOne({
         _id:
           new ObjectId(id),
       })
 
+
     if (!tool) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Tool not found",
         },
@@ -114,7 +136,9 @@ export async function GET(
           status: 404,
         }
       )
+
     }
+
 
     // --------------------------------
     // RESPONSE
@@ -122,22 +146,32 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+
       data: tool,
     })
+
   } catch (error) {
+
     console.error(
       "GET TOOL ERROR:",
       error
     )
+
+
+    // --------------------------------
+    // AUTH ERROR
+    // --------------------------------
 
     if (
       error instanceof Error &&
       error.message ===
         "Authentication required"
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Authentication required",
         },
@@ -145,7 +179,13 @@ export async function GET(
           status: 401,
         }
       )
+
     }
+
+
+    // --------------------------------
+    // PERMISSION ERROR
+    // --------------------------------
 
     if (
       error instanceof Error &&
@@ -153,9 +193,11 @@ export async function GET(
         "permission"
       )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -163,11 +205,18 @@ export async function GET(
           status: 403,
         }
       )
+
     }
+
+
+    // --------------------------------
+    // GENERIC ERROR
+    // --------------------------------
 
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Unable to fetch tool",
       },
@@ -175,7 +224,9 @@ export async function GET(
         status: 500,
       }
     )
+
   }
+
 }
 
 
@@ -189,16 +240,24 @@ export async function PATCH(
     params,
   }: Params
 ) {
+
   let newImageUrl:
     | string
     | undefined
 
+
+  let databaseUpdated =
+    false
+
+
   try {
+
     // --------------------------------
     // CSRF
     // --------------------------------
 
     requireCsrf(req)
+
 
     // --------------------------------
     // AUTH
@@ -212,6 +271,7 @@ export async function PATCH(
       "admin"
     )
 
+
     // --------------------------------
     // PARAMS
     // --------------------------------
@@ -220,12 +280,15 @@ export async function PATCH(
       id,
     } = await params
 
+
     if (
       !ObjectId.isValid(id)
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid tool ID",
         },
@@ -233,10 +296,13 @@ export async function PATCH(
           status: 400,
         }
       )
+
     }
+
 
     const toolId =
       new ObjectId(id)
+
 
     // --------------------------------
     // DATABASE
@@ -248,6 +314,7 @@ export async function PATCH(
     const tools =
       getToolCollection(db)
 
+
     // --------------------------------
     // FIND EXISTING TOOL
     // --------------------------------
@@ -258,10 +325,13 @@ export async function PATCH(
           toolId,
       })
 
+
     if (!existing) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Tool not found",
         },
@@ -269,7 +339,9 @@ export async function PATCH(
           status: 404,
         }
       )
+
     }
+
 
     // --------------------------------
     // FORM DATA
@@ -277,6 +349,7 @@ export async function PATCH(
 
     const formData =
       await req.formData()
+
 
     const nameValue =
       formData.get(
@@ -293,6 +366,7 @@ export async function PATCH(
         "image"
       )
 
+
     // --------------------------------
     // UPDATE DATA
     // --------------------------------
@@ -303,9 +377,12 @@ export async function PATCH(
       image?: string
       updatedAt: Date
     } = {
+
       updatedAt:
         new Date(),
+
     }
+
 
     // --------------------------------
     // NAME
@@ -314,15 +391,19 @@ export async function PATCH(
     if (
       nameValue !== null
     ) {
+
       const name =
         String(
           nameValue
         ).trim()
 
+
       if (!name) {
+
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Tool name cannot be empty",
           },
@@ -330,11 +411,15 @@ export async function PATCH(
             status: 400,
           }
         )
+
       }
+
 
       updateData.name =
         name
+
     }
+
 
     // --------------------------------
     // ACTIVE STATUS
@@ -343,18 +428,22 @@ export async function PATCH(
     if (
       isActiveValue !== null
     ) {
+
       const value =
         String(
           isActiveValue
         )
 
+
       if (
         value !== "true" &&
         value !== "false"
       ) {
+
         return NextResponse.json(
           {
             success: false,
+
             message:
               "isActive must be true or false",
           },
@@ -362,11 +451,15 @@ export async function PATCH(
             status: 400,
           }
         )
+
       }
+
 
       updateData.isActive =
         value === "true"
+
     }
+
 
     // --------------------------------
     // IMAGE UPDATE
@@ -375,10 +468,15 @@ export async function PATCH(
     if (
       image instanceof File
     ) {
-      if (image.size === 0) {
+
+      if (
+        image.size === 0
+      ) {
+
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Image cannot be empty",
           },
@@ -386,19 +484,51 @@ export async function PATCH(
             status: 400,
           }
         )
+
       }
 
+
+      // --------------------------------
+      // UPLOAD NEW IMAGE
+      // --------------------------------
+
       const uploaded =
-        await uploadToolImage(
-          image
+        await uploadImage(
+          image,
+          {
+            folder:
+              "tools",
+
+            removeBackground:
+              true,
+
+            backgroundModel:
+              "medium",
+
+            maxWidth:
+              1200,
+
+            maxHeight:
+              1200,
+
+            format:
+              "png",
+
+            quality:
+              90,
+          }
         )
+
 
       newImageUrl =
         uploaded.url
 
+
       updateData.image =
         uploaded.url
+
     }
+
 
     // --------------------------------
     // UPDATE DATABASE
@@ -415,6 +545,11 @@ export async function PATCH(
       }
     )
 
+
+    databaseUpdated =
+      true
+
+
     // --------------------------------
     // DELETE OLD IMAGE
     // --------------------------------
@@ -425,10 +560,26 @@ export async function PATCH(
       existing.image !==
         newImageUrl
     ) {
-      await deleteToolImage(
-        existing.image
-      )
+
+      try {
+
+        await deleteImage(
+          existing.image
+        )
+
+      } catch (
+        imageError
+      ) {
+
+        console.error(
+          "FAILED TO DELETE OLD TOOL IMAGE:",
+          imageError
+        )
+
+      }
+
     }
+
 
     // --------------------------------
     // GET UPDATED TOOL
@@ -439,6 +590,7 @@ export async function PATCH(
         _id:
           toolId,
       })
+
 
     // --------------------------------
     // AUDIT
@@ -459,6 +611,7 @@ export async function PATCH(
           id,
 
         changes: {
+
           name:
             nameValue !== null,
 
@@ -470,9 +623,11 @@ export async function PATCH(
             Boolean(
               newImageUrl
             ),
+
         },
       },
     })
+
 
     // --------------------------------
     // RESPONSE
@@ -487,26 +642,51 @@ export async function PATCH(
       data:
         updated,
     })
+
   } catch (error) {
+
     console.error(
       "UPDATE TOOL ERROR:",
       error
     )
 
+
     // --------------------------------
-    // CLEANUP NEW BLOB
+    // CLEANUP NEW IMAGE
     // --------------------------------
     //
-    // If the new image uploaded but
-    // MongoDB update failed, remove
-    // the newly uploaded Blob.
+    // Only delete the new image if
+    // database update did NOT succeed.
+    //
+    // If DB update succeeded but audit
+    // failed, keep the image because
+    // MongoDB already references it.
     // --------------------------------
 
-    if (newImageUrl) {
-      await deleteToolImage(
-        newImageUrl
-      )
+    if (
+      newImageUrl &&
+      !databaseUpdated
+    ) {
+
+      try {
+
+        await deleteImage(
+          newImageUrl
+        )
+
+      } catch (
+        cleanupError
+      ) {
+
+        console.error(
+          "FAILED TO CLEANUP NEW TOOL IMAGE:",
+          cleanupError
+        )
+
+      }
+
     }
+
 
     // --------------------------------
     // CSRF ERROR
@@ -517,9 +697,11 @@ export async function PATCH(
       error.message ===
         "Invalid CSRF token"
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid CSRF token",
         },
@@ -527,7 +709,9 @@ export async function PATCH(
           status: 403,
         }
       )
+
     }
+
 
     // --------------------------------
     // IMAGE ERROR
@@ -541,12 +725,17 @@ export async function PATCH(
         ) ||
         error.message.includes(
           "Image size"
+        ) ||
+        error.message.includes(
+          "Image background"
         )
       )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -554,7 +743,9 @@ export async function PATCH(
           status: 400,
         }
       )
+
     }
+
 
     // --------------------------------
     // AUTH ERROR
@@ -562,12 +753,19 @@ export async function PATCH(
 
     if (
       error instanceof Error &&
-      error.message ===
-        "Authentication required"
+      (
+        error.message ===
+          "Authentication required" ||
+
+        error.message ===
+          "Invalid access token"
+      )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Authentication required",
         },
@@ -575,7 +773,9 @@ export async function PATCH(
           status: 401,
         }
       )
+
     }
+
 
     // --------------------------------
     // PERMISSION ERROR
@@ -587,9 +787,11 @@ export async function PATCH(
         "permission"
       )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -597,7 +799,9 @@ export async function PATCH(
           status: 403,
         }
       )
+
     }
+
 
     // --------------------------------
     // GENERIC ERROR
@@ -606,14 +810,19 @@ export async function PATCH(
     return NextResponse.json(
       {
         success: false,
+
         message:
-          "Unable to update tool",
+          error instanceof Error
+            ? error.message
+            : "Unable to update tool",
       },
       {
         status: 500,
       }
     )
+
   }
+
 }
 
 
@@ -627,12 +836,15 @@ export async function DELETE(
     params,
   }: Params
 ) {
+
   try {
+
     // --------------------------------
     // CSRF
     // --------------------------------
 
     requireCsrf(req)
+
 
     // --------------------------------
     // AUTH
@@ -646,6 +858,7 @@ export async function DELETE(
       "admin"
     )
 
+
     // --------------------------------
     // PARAMS
     // --------------------------------
@@ -654,12 +867,15 @@ export async function DELETE(
       id,
     } = await params
 
+
     if (
       !ObjectId.isValid(id)
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid tool ID",
         },
@@ -667,10 +883,13 @@ export async function DELETE(
           status: 400,
         }
       )
+
     }
+
 
     const toolId =
       new ObjectId(id)
+
 
     // --------------------------------
     // DATABASE
@@ -682,6 +901,7 @@ export async function DELETE(
     const tools =
       getToolCollection(db)
 
+
     // --------------------------------
     // FIND TOOL
     // --------------------------------
@@ -692,10 +912,13 @@ export async function DELETE(
           toolId,
       })
 
+
     if (!tool) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Tool not found",
         },
@@ -703,7 +926,9 @@ export async function DELETE(
           status: 404,
         }
       )
+
     }
+
 
     // --------------------------------
     // DELETE DATABASE RECORD
@@ -715,12 +940,16 @@ export async function DELETE(
           toolId,
       })
 
+
     if (
-      deleteResult.deletedCount !== 1
+      deleteResult.deletedCount !==
+      1
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Unable to delete tool",
         },
@@ -728,23 +957,44 @@ export async function DELETE(
           status: 500,
         }
       )
+
     }
+
 
     // --------------------------------
     // DELETE BLOB IMAGE
     // --------------------------------
 
-    if (tool.image) {
-      await deleteToolImage(
-        tool.image
-      )
+    if (
+      tool.image
+    ) {
+
+      try {
+
+        await deleteImage(
+          tool.image
+        )
+
+      } catch (
+        imageError
+      ) {
+
+        console.error(
+          "FAILED TO DELETE TOOL IMAGE:",
+          imageError
+        )
+
+      }
+
     }
+
 
     // --------------------------------
     // AUDIT
     // --------------------------------
 
     await logAudit({
+
       userId:
         user._id,
 
@@ -752,6 +1002,7 @@ export async function DELETE(
         "TOOL_DELETED",
 
       metadata: {
+
         resource:
           "tool",
 
@@ -763,24 +1014,33 @@ export async function DELETE(
 
         image:
           tool.image,
+
       },
+
     })
+
 
     // --------------------------------
     // RESPONSE
     // --------------------------------
 
     return NextResponse.json({
-      success: true,
+
+      success:
+        true,
 
       message:
         "Tool deleted successfully",
+
     })
+
   } catch (error) {
+
     console.error(
       "DELETE TOOL ERROR:",
       error
     )
+
 
     // --------------------------------
     // CSRF ERROR
@@ -791,9 +1051,11 @@ export async function DELETE(
       error.message ===
         "Invalid CSRF token"
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid CSRF token",
         },
@@ -801,7 +1063,9 @@ export async function DELETE(
           status: 403,
         }
       )
+
     }
+
 
     // --------------------------------
     // AUTH ERROR
@@ -809,12 +1073,19 @@ export async function DELETE(
 
     if (
       error instanceof Error &&
-      error.message ===
-        "Authentication required"
+      (
+        error.message ===
+          "Authentication required" ||
+
+        error.message ===
+          "Invalid access token"
+      )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Authentication required",
         },
@@ -822,7 +1093,9 @@ export async function DELETE(
           status: 401,
         }
       )
+
     }
+
 
     // --------------------------------
     // PERMISSION ERROR
@@ -834,9 +1107,11 @@ export async function DELETE(
         "permission"
       )
     ) {
+
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -844,7 +1119,9 @@ export async function DELETE(
           status: 403,
         }
       )
+
     }
+
 
     // --------------------------------
     // GENERIC ERROR
@@ -853,6 +1130,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Unable to delete tool",
       },
@@ -860,5 +1138,7 @@ export async function DELETE(
         status: 500,
       }
     )
+
   }
+
 }

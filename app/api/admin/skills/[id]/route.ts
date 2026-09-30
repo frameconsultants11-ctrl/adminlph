@@ -27,14 +27,18 @@ import {
 } from "@/lib/skill"
 
 import {
-  uploadSkillImage,
-  deleteSkillImage,
-} from "@/lib/skill-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import {
   logAudit,
 } from "@/lib/audit"
 
+
+// ==========================================
+// PARAMS
+// ==========================================
 
 type Params = {
   params: Promise<{
@@ -56,9 +60,12 @@ export async function GET(
 
   try {
 
+    // ==========================================
+    // AUTH
+    // ==========================================
+
     const user =
       await authenticate(req)
-
 
     authorize(
       user,
@@ -66,10 +73,18 @@ export async function GET(
     )
 
 
+    // ==========================================
+    // PARAMS
+    // ==========================================
+
     const {
       id,
     } = await params
 
+
+    // ==========================================
+    // VALIDATE ID
+    // ==========================================
 
     if (
       !ObjectId.isValid(id)
@@ -78,6 +93,7 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid skill ID",
         },
@@ -89,15 +105,22 @@ export async function GET(
     }
 
 
+    // ==========================================
+    // DATABASE
+    // ==========================================
+
     const db =
       await getDb()
-
 
     const skills =
       getSkillCollection(
         db
       )
 
+
+    // ==========================================
+    // GET SKILL
+    // ==========================================
 
     const skill =
       await skills.findOne({
@@ -111,6 +134,7 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Skill not found",
         },
@@ -122,8 +146,13 @@ export async function GET(
     }
 
 
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
     return NextResponse.json({
       success: true,
+
       data: skill,
     })
 
@@ -135,9 +164,61 @@ export async function GET(
     )
 
 
+    // ==========================================
+    // AUTH ERROR
+    // ==========================================
+
+    if (
+      error instanceof Error &&
+      error.message ===
+        "Authentication required"
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            "Authentication required",
+        },
+        {
+          status: 401,
+        }
+      )
+
+    }
+
+
+    // ==========================================
+    // PERMISSION ERROR
+    // ==========================================
+
+    if (
+      error instanceof Error &&
+      error.message.includes(
+        "permission"
+      )
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            error.message,
+        },
+        {
+          status: 403,
+        }
+      )
+
+    }
+
+
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Unable to fetch skill",
       },
@@ -145,7 +226,9 @@ export async function GET(
         status: 500,
       }
     )
+
   }
+
 }
 
 
@@ -167,12 +250,19 @@ export async function PATCH(
 
   try {
 
+    // ==========================================
+    // CSRF
+    // ==========================================
+
     requireCsrf(req)
 
 
+    // ==========================================
+    // AUTH
+    // ==========================================
+
     const user =
       await authenticate(req)
-
 
     authorize(
       user,
@@ -180,10 +270,18 @@ export async function PATCH(
     )
 
 
+    // ==========================================
+    // PARAMS
+    // ==========================================
+
     const {
       id,
     } = await params
 
+
+    // ==========================================
+    // VALIDATE ID
+    // ==========================================
 
     if (
       !ObjectId.isValid(id)
@@ -192,6 +290,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid skill ID",
         },
@@ -207,15 +306,22 @@ export async function PATCH(
       new ObjectId(id)
 
 
+    // ==========================================
+    // DATABASE
+    // ==========================================
+
     const db =
       await getDb()
-
 
     const skills =
       getSkillCollection(
         db
       )
 
+
+    // ==========================================
+    // GET EXISTING SKILL
+    // ==========================================
 
     const existing =
       await skills.findOne({
@@ -229,6 +335,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Skill not found",
         },
@@ -240,6 +347,10 @@ export async function PATCH(
     }
 
 
+    // ==========================================
+    // FORM DATA
+    // ==========================================
+
     const formData =
       await req.formData()
 
@@ -249,12 +360,10 @@ export async function PATCH(
         "name"
       )
 
-
     const isActiveValue =
       formData.get(
         "isActive"
       )
-
 
     const image =
       formData.get(
@@ -262,27 +371,26 @@ export async function PATCH(
       )
 
 
-    // ======================================
+    // ==========================================
     // UPDATE DATA
-    // ======================================
+    // ==========================================
 
     const updateData: {
       name?: string
-
       isActive?: boolean
-
       image?: string
-
       updatedAt: Date
     } = {
+
       updatedAt:
         new Date(),
+
     }
 
 
-    // ======================================
+    // ==========================================
     // NAME
-    // ======================================
+    // ==========================================
 
     if (
       nameValue !== null
@@ -299,6 +407,7 @@ export async function PATCH(
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Skill name cannot be empty",
           },
@@ -312,12 +421,13 @@ export async function PATCH(
 
       updateData.name =
         name
+
     }
 
 
-    // ======================================
+    // ==========================================
     // ACTIVE
-    // ======================================
+    // ==========================================
 
     if (
       isActiveValue !== null
@@ -337,6 +447,7 @@ export async function PATCH(
         return NextResponse.json(
           {
             success: false,
+
             message:
               "isActive must be true or false",
           },
@@ -350,12 +461,13 @@ export async function PATCH(
 
       updateData.isActive =
         value === "true"
+
     }
 
 
-    // ======================================
+    // ==========================================
     // IMAGE
-    // ======================================
+    // ==========================================
 
     if (
       image instanceof File
@@ -368,6 +480,7 @@ export async function PATCH(
         return NextResponse.json(
           {
             success: false,
+
             message:
               "Image cannot be empty",
           },
@@ -379,9 +492,35 @@ export async function PATCH(
       }
 
 
+      // ==========================================
+      // UPLOAD NEW IMAGE
+      // ==========================================
+
       const uploaded =
-        await uploadSkillImage(
-          image
+        await uploadImage(
+          image,
+          {
+            folder:
+              "skills",
+
+            removeBackground:
+              true,
+
+            backgroundModel:
+              "medium",
+
+            maxWidth:
+              1200,
+
+            maxHeight:
+              1200,
+
+            format:
+              "png",
+
+            quality:
+              90,
+          }
         )
 
 
@@ -391,12 +530,13 @@ export async function PATCH(
 
       updateData.image =
         uploaded.url
+
     }
 
 
-    // ======================================
-    // UPDATE
-    // ======================================
+    // ==========================================
+    // UPDATE DATABASE
+    // ==========================================
 
     await skills.updateOne(
       {
@@ -410,9 +550,9 @@ export async function PATCH(
     )
 
 
-    // ======================================
+    // ==========================================
     // DELETE OLD IMAGE
-    // ======================================
+    // ==========================================
 
     if (
       newImageUrl &&
@@ -421,15 +561,29 @@ export async function PATCH(
         newImageUrl
     ) {
 
-      await deleteSkillImage(
-        existing.image
-      )
+      try {
+
+        await deleteImage(
+          existing.image
+        )
+
+      } catch (
+        cleanupError
+      ) {
+
+        console.error(
+          "FAILED TO DELETE OLD SKILL IMAGE:",
+          cleanupError
+        )
+
+      }
+
     }
 
 
-    // ======================================
+    // ==========================================
     // GET UPDATED
-    // ======================================
+    // ==========================================
 
     const updated =
       await skills.findOne({
@@ -438,11 +592,12 @@ export async function PATCH(
       })
 
 
-    // ======================================
+    // ==========================================
     // AUDIT
-    // ======================================
+    // ==========================================
 
     await logAudit({
+
       userId:
         user._id,
 
@@ -450,6 +605,7 @@ export async function PATCH(
         "SKILL_UPDATED",
 
       metadata: {
+
         resource:
           "skill",
 
@@ -457,6 +613,7 @@ export async function PATCH(
           id,
 
         changes: {
+
           name:
             nameValue !== null,
 
@@ -468,12 +625,20 @@ export async function PATCH(
             Boolean(
               newImageUrl
             ),
+
         },
+
       },
+
     })
 
 
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
     return NextResponse.json({
+
       success: true,
 
       message:
@@ -481,6 +646,7 @@ export async function PATCH(
 
       data:
         updated,
+
     })
 
   } catch (error) {
@@ -491,16 +657,37 @@ export async function PATCH(
     )
 
 
+    // ==========================================
+    // CLEANUP NEW IMAGE
+    // ==========================================
+
     if (
       newImageUrl
     ) {
 
-      await deleteSkillImage(
-        newImageUrl
-      )
+      try {
+
+        await deleteImage(
+          newImageUrl
+        )
+
+      } catch (
+        cleanupError
+      ) {
+
+        console.error(
+          "FAILED TO CLEANUP NEW SKILL IMAGE:",
+          cleanupError
+        )
+
+      }
 
     }
 
+
+    // ==========================================
+    // CSRF ERROR
+    // ==========================================
 
     if (
       error instanceof Error &&
@@ -511,6 +698,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid CSRF token",
         },
@@ -521,6 +709,10 @@ export async function PATCH(
 
     }
 
+
+    // ==========================================
+    // IMAGE ERROR
+    // ==========================================
 
     if (
       error instanceof Error &&
@@ -537,6 +729,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -548,15 +741,25 @@ export async function PATCH(
     }
 
 
+    // ==========================================
+    // AUTH ERROR
+    // ==========================================
+
     if (
       error instanceof Error &&
-      error.message ===
-        "Authentication required"
+      (
+        error.message ===
+          "Authentication required" ||
+
+        error.message ===
+          "Invalid access token"
+      )
     ) {
 
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Authentication required",
         },
@@ -568,6 +771,10 @@ export async function PATCH(
     }
 
 
+    // ==========================================
+    // PERMISSION ERROR
+    // ==========================================
+
     if (
       error instanceof Error &&
       error.message.includes(
@@ -578,6 +785,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -589,9 +797,14 @@ export async function PATCH(
     }
 
 
+    // ==========================================
+    // GENERAL ERROR
+    // ==========================================
+
     return NextResponse.json(
       {
         success: false,
+
         message:
           error instanceof Error
             ? error.message
@@ -601,7 +814,9 @@ export async function PATCH(
         status: 500,
       }
     )
+
   }
+
 }
 
 
@@ -618,12 +833,19 @@ export async function DELETE(
 
   try {
 
+    // ==========================================
+    // CSRF
+    // ==========================================
+
     requireCsrf(req)
 
 
+    // ==========================================
+    // AUTH
+    // ==========================================
+
     const user =
       await authenticate(req)
-
 
     authorize(
       user,
@@ -631,10 +853,18 @@ export async function DELETE(
     )
 
 
+    // ==========================================
+    // PARAMS
+    // ==========================================
+
     const {
       id,
     } = await params
 
+
+    // ==========================================
+    // VALIDATE ID
+    // ==========================================
 
     if (
       !ObjectId.isValid(id)
@@ -643,6 +873,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid skill ID",
         },
@@ -658,15 +889,22 @@ export async function DELETE(
       new ObjectId(id)
 
 
+    // ==========================================
+    // DATABASE
+    // ==========================================
+
     const db =
       await getDb()
-
 
     const skills =
       getSkillCollection(
         db
       )
 
+
+    // ==========================================
+    // GET SKILL
+    // ==========================================
 
     const skill =
       await skills.findOne({
@@ -680,6 +918,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Skill not found",
         },
@@ -690,6 +929,10 @@ export async function DELETE(
 
     }
 
+
+    // ==========================================
+    // DELETE DATABASE RECORD
+    // ==========================================
 
     const deleteResult =
       await skills.deleteOne({
@@ -706,6 +949,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Unable to delete skill",
         },
@@ -717,26 +961,40 @@ export async function DELETE(
     }
 
 
-    // ======================================
+    // ==========================================
     // DELETE IMAGE
-    // ======================================
+    // ==========================================
 
     if (
       skill.image
     ) {
 
-      await deleteSkillImage(
-        skill.image
-      )
+      try {
+
+        await deleteImage(
+          skill.image
+        )
+
+      } catch (
+        imageError
+      ) {
+
+        console.error(
+          "FAILED TO DELETE SKILL IMAGE:",
+          imageError
+        )
+
+      }
 
     }
 
 
-    // ======================================
+    // ==========================================
     // AUDIT
-    // ======================================
+    // ==========================================
 
     await logAudit({
+
       userId:
         user._id,
 
@@ -744,6 +1002,7 @@ export async function DELETE(
         "SKILL_DELETED",
 
       metadata: {
+
         resource:
           "skill",
 
@@ -755,15 +1014,23 @@ export async function DELETE(
 
         image:
           skill.image,
+
       },
+
     })
 
 
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
     return NextResponse.json({
+
       success: true,
 
       message:
         "Skill deleted successfully",
+
     })
 
   } catch (error) {
@@ -774,6 +1041,10 @@ export async function DELETE(
     )
 
 
+    // ==========================================
+    // CSRF ERROR
+    // ==========================================
+
     if (
       error instanceof Error &&
       error.message ===
@@ -783,6 +1054,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Invalid CSRF token",
         },
@@ -794,15 +1066,25 @@ export async function DELETE(
     }
 
 
+    // ==========================================
+    // AUTH ERROR
+    // ==========================================
+
     if (
       error instanceof Error &&
-      error.message ===
-        "Authentication required"
+      (
+        error.message ===
+          "Authentication required" ||
+
+        error.message ===
+          "Invalid access token"
+      )
     ) {
 
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Authentication required",
         },
@@ -814,6 +1096,10 @@ export async function DELETE(
     }
 
 
+    // ==========================================
+    // PERMISSION ERROR
+    // ==========================================
+
     if (
       error instanceof Error &&
       error.message.includes(
@@ -824,6 +1110,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
+
           message:
             error.message,
         },
@@ -835,9 +1122,14 @@ export async function DELETE(
     }
 
 
+    // ==========================================
+    // GENERAL ERROR
+    // ==========================================
+
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Unable to delete skill",
       },
@@ -845,5 +1137,7 @@ export async function DELETE(
         status: 500,
       }
     )
+
   }
+
 }

@@ -23,9 +23,9 @@ import {
 } from "@/models/trainer"
 
 import {
-  uploadTrainerImage,
-  deleteTrainerImage,
-} from "@/lib/trainer-image"
+  uploadImage,
+  deleteImage,
+} from "@/lib/image/image-upload"
 
 import {
   hashTrainerPassword,
@@ -876,10 +876,21 @@ export async function POST(
        IMAGE UPLOAD
     ========================= */
 
-    uploadedImage =
-      await uploadTrainerImage(
-        imageValue
-      )
+   const imageResult =
+  await uploadImage(
+    imageValue,
+    {
+      folder: "trainers",
+      removeBackground: true,
+      backgroundModel: "medium",
+      maxWidth: 1200,
+      maxHeight: 1200,
+      format: "png",
+    }
+  )
+
+uploadedImage =
+  imageResult.url
 
     /* =========================
        PASSWORD HASH
@@ -990,12 +1001,11 @@ export async function POST(
     )
 
     /* Cleanup uploaded image */
-
-    if (uploadedImage) {
-      await deleteTrainerImage(
-        uploadedImage
-      )
-    }
+if (uploadedImage) {
+  await deleteImage(
+    uploadedImage
+  )
+}
 
     const message =
       error?.message ||

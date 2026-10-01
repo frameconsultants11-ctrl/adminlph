@@ -573,12 +573,9 @@ const RichEditor = forwardRef<
                 --------------------------------------------- */
 
                 table: {
-                  class:
-                    TableModule.default,
-
-                  inlineToolbar:
-                    true,
-                },
+  class: TableModule.default as any,
+  inlineToolbar: true,
+},
 
                 /* ---------------------------------------------
                    CODE
